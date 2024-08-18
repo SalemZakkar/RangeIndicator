@@ -36,28 +36,27 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       ),
       body: Container(
         width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
         alignment: Alignment.center,
         constraints: const BoxConstraints.expand(),
         // alignment: Alignment.center,
         child: TabBarView(
           physics: const NeverScrollableScrollPhysics(),
           controller: tabController,
-          children: const [VerticalView(), HorizontalView()],
+          children: const [HorizontalScreen(), VerticalScreen()],
         ),
       ),
     );
   }
 }
 
-class VerticalView extends StatefulWidget {
-  const VerticalView({super.key});
+class HorizontalScreen extends StatefulWidget {
+  const HorizontalScreen({super.key});
 
   @override
-  State<VerticalView> createState() => _VerticalViewState();
+  State<HorizontalScreen> createState() => _HorizontalScreenState();
 }
 
-class _VerticalViewState extends State<VerticalView> {
+class _HorizontalScreenState extends State<HorizontalScreen> {
   List<Range> ranges = [];
 
   @override
@@ -70,44 +69,42 @@ class _VerticalViewState extends State<VerticalView> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        RangeIndicator(
-          axis: Axis.horizontal,
-          thumbRadius: 20,
-          railWidth: 5,
-          ranges: [
-            RangeInfo(end: 30, color: Colors.blue),
-            RangeInfo(end: 60, color: Colors.green),
-            RangeInfo(end: 90, color: Colors.red),
-          ],
-          min: 10,
-          onChanged: (List<Range> value) {
-            // print(value);
-            setState(() {
-              ranges = value;
-            });
-          },
+        Padding(
+          padding: const EdgeInsets.only(left: 10, right: 10),
+          child: RangeIndicator(
+            axis: Axis.horizontal,
+            thumbRadius: 30,
+            railWidth: 5,
+            ranges: [
+              RangeInfo(end: 50, color: Colors.blue),
+              RangeInfo(end: 100, color: Colors.red),
+            ],
+            min: 1,
+            onChanged: (List<Range> value) {
+              // print(value);
+              setState(() {
+                ranges = value;
+              });
+            },
+          ),
         ),
         const SizedBox(
           height: 30,
         ),
-        Text(
-          ranges.toString(),
-          style: Theme.of(context).textTheme.headlineMedium,
-          textAlign: TextAlign.center,
-        ),
+        ViewAsText(ranges: ranges),
       ],
     );
   }
 }
 
-class HorizontalView extends StatefulWidget {
-  const HorizontalView({super.key});
+class VerticalScreen extends StatefulWidget {
+  const VerticalScreen({super.key});
 
   @override
-  State<HorizontalView> createState() => _HorizontalViewState();
+  State<VerticalScreen> createState() => _VerticalScreenState();
 }
 
-class _HorizontalViewState extends State<HorizontalView> {
+class _VerticalScreenState extends State<VerticalScreen> {
   List<Range> ranges = [];
 
   @override
@@ -120,12 +117,12 @@ class _HorizontalViewState extends State<HorizontalView> {
           child: RangeIndicator(
             axis: Axis.vertical,
             thumbRadius: 20,
-            railWidth: 5,
+            railWidth: 7,
             ranges: [
-              RangeInfo(end: 30, color: Colors.blue),
-              RangeInfo(end: 90, color: Colors.red),
+              RangeInfo(end: 50, color: Colors.blue),
+              RangeInfo(end: 100, color: Colors.red),
             ],
-            min: 10,
+            min: 1,
             onChanged: (List<Range> value) {
               // print(value);
               setState(() {
@@ -135,12 +132,43 @@ class _HorizontalViewState extends State<HorizontalView> {
           ),
         ),
         Expanded(
-          child: Text(
-            ranges.toString(),
-            style: Theme.of(context).textTheme.headlineMedium,
-            textAlign: TextAlign.center,
+          child: ViewAsText(
+            ranges: ranges,
           ),
         ),
+      ],
+    );
+  }
+}
+
+class ViewAsText extends StatelessWidget {
+  final List<Range> ranges;
+
+  const ViewAsText({super.key, required this.ranges});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < ranges.length; i++)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "RANGE ${i + 1}",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              Text(
+                "start ${ranges[i].start.toStringAsFixed(2)}",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              Text(
+                "end ${ranges[i].end.toStringAsFixed(2)}",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          )
       ],
     );
   }
