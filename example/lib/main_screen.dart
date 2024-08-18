@@ -56,37 +56,31 @@ class HorizontalScreen extends StatefulWidget {
   State<HorizontalScreen> createState() => _HorizontalScreenState();
 }
 
-class _HorizontalScreenState extends State<HorizontalScreen> {
+class _HorizontalScreenState extends State<HorizontalScreen> with AutomaticKeepAliveClientMixin {
   List<Range> ranges = [];
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 10, right: 10),
-          child: RangeIndicator(
-            axis: Axis.horizontal,
-            thumbRadius: 30,
-            railWidth: 5,
-            ranges: [
-              RangeInfo(end: 50, color: Colors.blue),
-              RangeInfo(end: 100, color: Colors.red),
-            ],
-            min: 1,
-            onChanged: (List<Range> value) {
-              // print(value);
-              setState(() {
-                ranges = value;
-              });
-            },
-          ),
+        RangeIndicator(
+          axis: Axis.horizontal,
+          thumbRadius: 30,
+          railWidth: 5,
+          ranges: [
+            RangeInfo(end: 50, color: Colors.blue),
+            RangeInfo(end: 100, color: Colors.red),
+            RangeInfo(end: 150, color: Colors.purple),
+          ],
+          min: 1,
+          onChanged: (List<Range> value) {
+            // print(value);
+            setState(() {
+              ranges = value;
+            });
+          },
         ),
         const SizedBox(
           height: 30,
@@ -95,6 +89,10 @@ class _HorizontalScreenState extends State<HorizontalScreen> {
       ],
     );
   }
+
+  @override
+  // TODO: implement wantKeepAlive
+  bool get wantKeepAlive => true;
 }
 
 class VerticalScreen extends StatefulWidget {
@@ -104,11 +102,12 @@ class VerticalScreen extends StatefulWidget {
   State<VerticalScreen> createState() => _VerticalScreenState();
 }
 
-class _VerticalScreenState extends State<VerticalScreen> {
+class _VerticalScreenState extends State<VerticalScreen> with AutomaticKeepAliveClientMixin{
   List<Range> ranges = [];
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -116,11 +115,12 @@ class _VerticalScreenState extends State<VerticalScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: RangeIndicator(
             axis: Axis.vertical,
-            thumbRadius: 20,
+            thumbRadius: 30,
             railWidth: 7,
             ranges: [
               RangeInfo(end: 50, color: Colors.blue),
               RangeInfo(end: 100, color: Colors.red),
+              RangeInfo(end: 150, color: Colors.purple),
             ],
             min: 1,
             onChanged: (List<Range> value) {
@@ -139,6 +139,10 @@ class _VerticalScreenState extends State<VerticalScreen> {
       ],
     );
   }
+
+  @override
+  // TODO: implement wantKeepAlive
+  bool get wantKeepAlive => true;
 }
 
 class ViewAsText extends StatelessWidget {
