@@ -1,6 +1,6 @@
 import 'dart:math';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:range_indicator/ui/range_render.dart';
 
 import 'indicator_functions.dart';
 
@@ -14,9 +14,14 @@ class RangeIndicator extends StatefulWidget {
   final double railWidth;
   final bool enable;
   final num Function(num n) numberBuilder;
+  final ValueChanged<num>? onMinChanged;
+  final ValueChanged<num>? onMaxChanged;
   final num? segment;
+  final num? safeZone;
   final RangeType rangeType;
   final num unBoundedPush;
+  final Duration? animationsDuration;
+  final RangeIndicatorController? controller;
 
   const RangeIndicator(
       {super.key,
@@ -31,7 +36,12 @@ class RangeIndicator extends StatefulWidget {
       this.segment,
       this.thumbRadius = 15,
       required this.rangeType,
-      this.unBoundedPush = 0});
+      this.animationsDuration,
+      this.safeZone,
+      this.unBoundedPush = 0,
+      this.onMaxChanged,
+      this.onMinChanged,
+      this.controller});
 
   @override
   State<RangeIndicator> createState() => _RangeIndicatorState();
@@ -41,7 +51,6 @@ class _RangeIndicatorState extends State<RangeIndicator> {
   List<RangeInfo> ranges = [];
   bool initiated = false;
   GlobalKey keyV = GlobalKey(), keyH = GlobalKey();
-  bool viewHeader = false;
 
   @override
   void didUpdateWidget(covariant RangeIndicator oldWidget) {
@@ -56,9 +65,11 @@ class _RangeIndicatorState extends State<RangeIndicator> {
       setState(() {});
     }
     if (isDiffLists(oldWidget.ranges, widget.ranges)) {
-      // setState(() {
-      //   viewHeader = false;
-      // });
+      initiated = false;
+      init();
+      setState(() {});
+    }
+    if (oldWidget.min != widget.min) {
       initiated = false;
       init();
       setState(() {});
@@ -71,6 +82,18 @@ class _RangeIndicatorState extends State<RangeIndicator> {
   void initState() {
     super.initState();
     init();
+    widget.controller?.addListener(() {
+      if (widget.controller?.isRefresh == true) {
+        initiated = false;
+        init(initialMin: start, initial: widget.ranges);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    widget.controller?.dispose();
   }
 
   void init({List<RangeInfo>? initial, num? initialMin}) {
@@ -82,7 +105,6 @@ class _RangeIndicatorState extends State<RangeIndicator> {
     ranges = checkIfRangesIsValid(initial ?? widget.ranges, widget.rangeType);
     end = ranges.last.end.toDouble();
     ruler = (end - start).abs();
-    viewHeader = true;
     WidgetsBinding.instance.addPostFrameCallback((t) {
       update();
     });
@@ -106,6 +128,7 @@ class _RangeIndicatorState extends State<RangeIndicator> {
       s = ranges[i - 1].end.toDouble();
       e = ranges[i].end.toDouble();
     }
+
     return ((e - s) / (ruler)) *
         ((widget.axis == Axis.horizontal ? totalWidth : totalHeight) - padding);
   }
@@ -115,15 +138,15 @@ class _RangeIndicatorState extends State<RangeIndicator> {
         ((widget.axis == Axis.horizontal ? totalWidth : totalHeight) - padding);
   }
 
-  double calcThumbSafePush(int i) {
-    if (i == ranges.length - 1) {
-      return 0;
-    }
-    if (getPush(i + 1) - getPush(i) <( widget.thumbRadius / 4)) {
-      return widget.thumbRadius / 2 + calcThumbSafePush(i + 1);
-    }
-    return 0;
-  }
+  // double calcThumbSafePush(int i) {
+  //   if (i == ranges.length - 1) {
+  //     return 0;
+  //   }
+  //   if (getPush(i + 1) - getPush(i) < (widget.thumbRadius / 4)) {
+  //     return widget.thumbRadius / 2 + calcThumbSafePush(i + 1);
+  //   }
+  //   return 0;
+  // }
 
   double getPush(int i) {
     double f = 0;
@@ -138,225 +161,208 @@ class _RangeIndicatorState extends State<RangeIndicator> {
 
   void update() {
     num k = widget.numberBuilder(widget.segment ?? 0);
-    List<Range> r = [
-      Range(
+    List<Range> r = [];
+    if (widget.rangeType == RangeType.unBounded ||
+        widget.rangeType == RangeType.unBoundedMin) {
+      r.add(Range.unBoundedMin(
+        end: widget.numberBuilder.call(ranges.first.end),
+      ));
+    } else {
+      r.add(Range.normal(
           start: widget.numberBuilder.call(start),
-          end: widget.numberBuilder.call(ranges.first.end))
-    ];
-    for (int i = 1; i < ranges.length; i++) {
+          end: widget.numberBuilder.call(ranges.first.end)));
+    }
+    for (int i = 1; i < ranges.length - 1; i++) {
       r.addAll([
-        Range(
+        Range.normal(
             start: widget.numberBuilder.call(ranges[i - 1].end + k),
             end: widget.numberBuilder.call(ranges[i].end))
       ]);
     }
+    if (widget.rangeType == RangeType.unBounded ||
+        widget.rangeType == RangeType.unBoundedMax) {
+      r.addAll([
+        Range.unBoundedMax(
+          start: widget.numberBuilder.call(ranges[ranges.length - 2].end + k),
+        )
+      ]);
+    } else {
+      r.add(Range.normal(
+        start: widget.numberBuilder.call(ranges[ranges.length - 2].end + k),
+        end: widget.numberBuilder.call(ranges[ranges.length - 1].end + k),
+      ));
+    }
     widget.onChanged.call(r);
-  }
-
-  Widget _getNumberHeadersH() {
-    return SizedBox(
-      height: widget.axis == Axis.horizontal ? 14 : null,
-      width: widget.axis == Axis.vertical ? 14 : null,
-      // width: 14,
-      child: Stack(
-        children: [
-          Positioned(
-            left: widget.axis == Axis.horizontal ? 0 : null,
-            top: widget.axis == Axis.vertical ? 0 : null,
-            child: Text(
-              widget.rangeType == RangeType.unBounded ||
-                      widget.rangeType == RangeType.unBoundedMin
-                  ? "∞"
-                  : widget.numberBuilder.call(start).toStringAsFixed(0),
-              style: TextStyle(color: ranges.first.color, fontSize: 11),
-            ),
-          ),
-          Positioned(
-            right: widget.axis == Axis.horizontal ? 0 : null,
-            bottom: widget.axis == Axis.vertical ? 0 : null,
-            child: Text(
-              widget.rangeType == RangeType.unBounded ||
-                      widget.rangeType == RangeType.unBoundedMax
-                  ? "∞"
-                  : widget.numberBuilder
-                      .call(ranges.last.end)
-                      .toStringAsFixed(0),
-              style: TextStyle(color: ranges.last.color, fontSize: 11),
-            ),
-          ),
-          for (int i = 0; i < ranges.length - 1; i++)
-            Positioned(
-              left: widget.axis == Axis.horizontal
-                  ? getPush(i) + getPixelsForEach(i)
-                  : null,
-              top: widget.axis == Axis.vertical
-                  ? getPush(i) + getPixelsForEach(i)
-                  : null,
-              // top: 4,
-              child: RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(children: [
-                  TextSpan(
-                    text: widget.numberBuilder
-                        .call(ranges[i].end)
-                        .toStringAsFixed(0),
-                    // text: 10.toString(),
-                    style: TextStyle(color: ranges[i].color, fontSize: 9),
-                  ),
-                  TextSpan(
-                    text:
-                        ' ${widget.numberBuilder.call(ranges[i].end + (widget.segment ?? 0)).toString()}',
-                    style: TextStyle(color: ranges[i + 1].color, fontSize: 9),
-                  )
-                ]),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return _ColOrRow(
-      axis: widget.axis,
-      children: [
-        viewHeader ? _getNumberHeadersH() : const SizedBox(),
-        Container(
-          alignment: Alignment.center,
-          // color: Colors.red,
-          width: widget.axis == Axis.horizontal
-              ? null
-              : max(widget.thumbRadius, widget.railWidth) + 1,
-          height: widget.axis == Axis.vertical
-              ? null
-              : max(widget.thumbRadius, widget.railWidth) + 1,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              totalWidth = constraints.maxWidth;
-              totalHeight = constraints.maxHeight;
-              init();
-              return Stack(
-                children: [
-                  SizedBox(
-                    width: widget.axis == Axis.horizontal
-                        ? null
-                        : max(widget.thumbRadius, widget.railWidth) + 1,
-                    height: widget.axis == Axis.vertical
-                        ? null
-                        : max(widget.thumbRadius, widget.railWidth) + 1,
-                    child: widget.axis == Axis.horizontal
-                        ? RailBuilder(
-                            axis: widget.axis,
-                            child: Row(
-                              key: keyH,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (int i = 0; i < ranges.length; i++)
-                                  _Rail(
-                                    start: i,
-                                    axis: widget.axis,
-                                    end: ranges.length,
-                                    width: getPixelsForEach(i),
-                                    height: widget.railWidth,
-                                    color: ranges[i].color,
-                                    from:
-                                        i == 0 ? widget.min : ranges[i - 1].end,
-                                    to: ranges[i].end,
-                                  ),
-                              ],
-                            ),
-                            onBuild: (val) {
-                              setState(() {
-                                startXY = val;
-                              });
-                            })
-                        : RailBuilder(
-                            axis: widget.axis,
-                            onBuild: (val) {
-                              setState(() {
-                                startXY = val;
-                              });
-                            },
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              // crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                for (int i = 0; i < ranges.length; i++)
-                                  _Rail(
-                                    start: i,
-                                    axis: widget.axis,
-                                    end: ranges.length,
-                                    height: getPixelsForEach(i),
-                                    width: widget.railWidth,
-                                    color: ranges[i].color,
-                                    from:
-                                        i == 0 ? widget.min : ranges[i - 1].end,
-                                    to: ranges[i].end,
-                                  ),
-                              ],
-                            ),
-                          ),
-                  ),
-                  for (int i = 1; i < ranges.length; i++)
-                    Positioned(
-                      left: widget.axis == Axis.horizontal
-                          ? getPush(i) - calcThumbSafePush(i)
-                          : null,
-                      top: widget.axis == Axis.vertical ? getPush(i) : 1,
-                      child: _Thumb(
-                          maximumViolated: () {
-                            if (i != ranges.length - 1) {
-                              return;
-                            }
-                            if (widget.rangeType == RangeType.unBounded ||
-                                widget.rangeType == RangeType.unBoundedMax) {
-                              RangeInfo r = ranges.last;
-                              ranges[ranges.length - 1] = RangeInfo(
-                                  end: r.end + widget.unBoundedPush,
-                                  color: r.color);
-                              initiated = false;
-                              init(initial: ranges, initialMin: start);
-                              setState(() {});
-                            }
-                          },
-                          minimumViolated: () {
-                            if (i != 1) {
-                              return;
-                            }
-                            if (widget.rangeType == RangeType.unBounded ||
-                                widget.rangeType == RangeType.unBoundedMin) {
-                              initiated = false;
-                              start -= widget.unBoundedPush;
-                              init(initial: ranges, initialMin: start);
-                              setState(() {});
-                            }
-                          },
-                          enable: widget.enable,
-                          cord: startXY,
-                          radius: widget.thumbRadius,
-                          start: start,
-                          axis: widget.axis,
-                          maximum: ranges[i].end,
-                          minimum: i - 1 == 0 ? start : ranges[i - 2].end,
-                          color: ranges[i - 1].color,
-                          maxPixels: widget.axis == Axis.horizontal
-                              ? totalWidth
-                              : totalHeight,
-                          ruler: ruler,
-                          positionChanged: (val) {
-                            setState(() {
-                              ranges[i - 1].end = val;
-                            });
-                            update();
-                          }),
-                    )
-                ],
-              );
-            },
-          ),
+    return MeasureSize(
+      onChange: (offset) {
+        setState(() {
+          startXY = widget.axis == Axis.horizontal
+              ? offset.dx.abs()
+              : offset.dy.abs();
+        });
+      },
+      child: SizedBox(
+        width: widget.axis == Axis.horizontal
+            ? MediaQuery.of(context).size.width
+            : null,
+        height: widget.axis == Axis.vertical
+            ? MediaQuery.of(context).size.height
+            : null,
+        child: _ColOrRow(
+          axis: widget.axis,
+          children: [
+            Container(
+              alignment: Alignment.center,
+              // color: Colors.red,
+              width: widget.axis == Axis.horizontal
+                  ? null
+                  : max(widget.thumbRadius, widget.railWidth) + 1,
+              height: widget.axis == Axis.vertical
+                  ? null
+                  : max(widget.thumbRadius, widget.railWidth) + 1,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  totalWidth = constraints.maxWidth;
+                  totalHeight = constraints.maxHeight;
+                  init();
+                  return Stack(
+                    children: [
+                      SizedBox(
+                        width: widget.axis == Axis.horizontal
+                            ? null
+                            : max(widget.thumbRadius, widget.railWidth) + 1,
+                        height: widget.axis == Axis.vertical
+                            ? null
+                            : max(widget.thumbRadius, widget.railWidth) + 1,
+                        child: widget.axis == Axis.horizontal
+                            ? RailBuilder(
+                                axis: widget.axis,
+                                child: Row(
+                                  key: keyH,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    for (int i = 0; i < ranges.length; i++)
+                                      _Rail(
+                                        start: i,
+                                        axis: widget.axis,
+                                        end: ranges.length,
+                                        width: getPixelsForEach(i),
+                                        height: widget.railWidth,
+                                        color: ranges[i].color,
+                                        from: i == 0
+                                            ? widget.min
+                                            : ranges[i - 1].end,
+                                        to: ranges[i].end,
+                                      ),
+                                  ],
+                                ),
+                                // onBuild: (val) {
+                                //   setState(() {
+                                //     startXY = val;
+                                //   });
+                                // }
+                              )
+                            : RailBuilder(
+                                axis: widget.axis,
+                                // onBuild: (val) {
+                                //   setState(() {
+                                //     startXY = val;
+                                //   });
+                                // },
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  // crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    for (int i = 0; i < ranges.length; i++)
+                                      _Rail(
+                                        start: i,
+                                        axis: widget.axis,
+                                        end: ranges.length,
+                                        height: getPixelsForEach(i),
+                                        width: widget.railWidth,
+                                        color: ranges[i].color,
+                                        from: i == 0
+                                            ? widget.min
+                                            : ranges[i - 1].end,
+                                        to: ranges[i].end,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                      for (int i = 1; i < ranges.length; i++)
+                        Positioned(
+                          left: widget.axis == Axis.horizontal
+                              ? getPush(i)
+                              : null,
+                          top: widget.axis == Axis.vertical ? getPush(i) : 1,
+                          child: _Thumb(
+                              safeZone: widget.safeZone,
+                              maximumViolated: () {
+                                if (i != ranges.length - 1) {
+                                  return;
+                                }
+                                if (widget.rangeType == RangeType.unBounded ||
+                                    widget.rangeType ==
+                                        RangeType.unBoundedMax) {
+                                  RangeInfo r = ranges.last;
+                                  ranges[ranges.length - 1] = RangeInfo(
+                                      end: r.end + widget.unBoundedPush,
+                                      color: r.color);
+
+                                  initiated = false;
+                                  init(initial: ranges, initialMin: start);
+                                  widget.onMaxChanged?.call(widget.numberBuilder
+                                      .call(r.end + widget.unBoundedPush));
+                                  setState(() {});
+                                }
+                              },
+                              minimumViolated: () {
+                                if (i != 1) {
+                                  return;
+                                }
+                                if (widget.rangeType == RangeType.unBounded ||
+                                    widget.rangeType ==
+                                        RangeType.unBoundedMin) {
+                                  initiated = false;
+                                  start -= widget.unBoundedPush;
+                                  init(initial: ranges, initialMin: start);
+                                  widget.onMinChanged
+                                      ?.call(widget.numberBuilder.call(start));
+                                  setState(() {});
+                                }
+                              },
+                              enable: widget.enable,
+                              cord: startXY,
+                              radius: widget.thumbRadius,
+                              start: start,
+                              axis: widget.axis,
+                              maximum: ranges[i].end,
+                              minimum: i - 1 == 0 ? start : ranges[i - 2].end,
+                              color: ranges[i - 1].color,
+                              maxPixels: widget.axis == Axis.horizontal
+                                  ? totalWidth
+                                  : totalHeight,
+                              ruler: ruler,
+                              positionChanged: (val) {
+                                setState(() {
+                                  ranges[i - 1].end = val;
+                                });
+                                update();
+                              }),
+                        )
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -373,6 +379,7 @@ class _Thumb extends StatefulWidget {
   final ValueChanged<double> positionChanged;
   final VoidCallback minimumViolated, maximumViolated;
   final bool enable;
+  final num? safeZone;
 
   const _Thumb(
       {this.color,
@@ -387,7 +394,8 @@ class _Thumb extends StatefulWidget {
       required this.enable,
       required this.maximumViolated,
       required this.minimumViolated,
-      required this.positionChanged});
+      required this.positionChanged,
+      this.safeZone});
 
   @override
   State<_Thumb> createState() => _ThumbState();
@@ -400,21 +408,26 @@ class _ThumbState extends State<_Thumb> {
         return;
       }
       double k = vertical ? details.dy : details.dx;
-      double safeRatio = (widget.radius / 2) / widget.maxPixels;
+      // double safeRatio = (widget.radius / 2) / widget.maxPixels;
       double ratio = (k - (widget.cord)) / (widget.maxPixels);
       if (ratio * widget.ruler + widget.start <
-          widget.minimum + (safeRatio * (widget.ruler + widget.start.abs()))) {
+          widget.minimum + (widget.safeZone ?? 0)) {
         widget.minimumViolated.call();
         return;
       }
       if (ratio * widget.ruler + widget.start >
-          widget.maximum - (safeRatio * (widget.ruler + widget.start.abs()))) {
+          widget.maximum - (widget.safeZone ?? 0)) {
         widget.maximumViolated.call();
         return;
       }
       double value = (ratio * widget.ruler) + widget.start;
       widget.positionChanged.call(value);
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override
@@ -516,12 +529,13 @@ class _Rail extends StatelessWidget {
 class RailBuilder extends StatefulWidget {
   final Axis axis;
   final Widget child;
-  final ValueChanged onBuild;
+
+  // final ValueChanged onBuild;
 
   const RailBuilder(
       {super.key,
       required this.child,
-      required this.onBuild,
+      // required this.onBuild,
       required this.axis});
 
   @override
@@ -529,17 +543,9 @@ class RailBuilder extends StatefulWidget {
 }
 
 class _RailBuilderState extends State<RailBuilder> {
-  RenderBox? _initializedRenderBox;
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializedRenderBox = context.findRenderObject() as RenderBox?;
-      final t = -_initializedRenderBox!.getTransformTo(null).getTranslation();
-      widget.onBuild
-          .call(widget.axis == Axis.horizontal ? t.x.abs() : t.y.abs());
-    });
   }
 
   @override
@@ -563,5 +569,20 @@ class _ColOrRow extends StatelessWidget {
         : Row(
             children: children,
           );
+  }
+}
+
+class RangeIndicatorController extends ChangeNotifier {
+  bool _r = false;
+
+  bool get isRefresh {
+    bool t = _r;
+    _r = false;
+    return t;
+  }
+
+  void update() {
+    _r = true;
+    notifyListeners();
   }
 }

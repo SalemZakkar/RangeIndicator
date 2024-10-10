@@ -3,14 +3,22 @@ import 'package:flutter/cupertino.dart';
 class Range {
   num end;
   num start;
-  Color? color;
+  bool isUnbounded;
 
   @override
   String toString() {
-    return "Range(start: $start end: $end)";
+    return 'Range(start: $start end: $end)';
   }
 
-  Range({required this.start, required this.end, this.color});
+  Range.normal({required this.start, required this.end}) : isUnbounded = false;
+  Range.unBoundedMax({
+    required this.start,
+  })  : end = double.infinity,
+        isUnbounded = true;
+  Range.unBoundedMin({
+    required this.end,
+  })  : start = -double.infinity,
+        isUnbounded = true;
 }
 
 class RangeInfo {
@@ -19,30 +27,37 @@ class RangeInfo {
 
   @override
   String toString() {
-    return "RangeInfo(end: $end)";
+    return 'RangeInfo(end: $end)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RangeInfo && end == other.end;
   }
 
   RangeInfo({required this.end, this.color});
+
+  @override
+  int get hashCode => end.hashCode;
 }
 
 List<RangeInfo> checkIfRangesIsValid(List<RangeInfo> l, RangeType rangeType) {
   if (l.length < 2) {
     throw FlutterErrorDetails(
-        exception: Exception("RANGES ERROR"),
+        exception: Exception('RANGES ERROR'),
         informationCollector: () {
-          return [DiagnosticsNode.message("must have at least two ranges")];
+          return [DiagnosticsNode.message('must have at least two ranges')];
         });
   }
   List<RangeInfo> data = [];
   data.addAll(l);
   data.sort(
-    (a, b) {
+        (a, b) {
       return a.end.compareTo(b.end);
     },
   );
-  if(rangeType == RangeType.unBounded || rangeType == RangeType.unBoundedMin){
-
-  }
+  if (rangeType == RangeType.unBounded ||
+      rangeType == RangeType.unBoundedMin) {}
   Map<num, bool> table = {};
   int duplicated = 0;
   for (int i = 0; i < data.length; i++) {
@@ -56,9 +71,9 @@ List<RangeInfo> checkIfRangesIsValid(List<RangeInfo> l, RangeType rangeType) {
   }
   if (duplicated > 0) {
     throw FlutterErrorDetails(
-        exception: Exception("RANGES ERROR"),
+        exception: Exception('RANGES ERROR'),
         informationCollector: () {
-          return [DiagnosticsNode.message("Ranges must be unique")];
+          return [DiagnosticsNode.message('Ranges must be unique')];
         });
   }
   return data;
@@ -69,17 +84,17 @@ bool isDiffLists(List<RangeInfo> old, List<RangeInfo> recent) {
     return true;
   }
   old.sort(
-    (a, b) {
+        (a, b) {
       return a.end.compareTo(b.end);
     },
   );
   recent.sort(
-    (a, b) {
+        (a, b) {
       return a.end.compareTo(b.end);
     },
   );
   for (int i = 0; i < old.length; i++) {
-    if (recent[i].end != old[i].end) {
+    if (recent[i] != old[i]) {
       return true;
     }
   }

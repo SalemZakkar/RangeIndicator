@@ -73,9 +73,10 @@ class _HorizontalScreenState extends State<HorizontalScreen>
               return val.toInt();
             },
             axis: Axis.horizontal,
-            rangeType: RangeType.unBoundedMax,
-            unBoundedPush: 3000000,
+            rangeType: RangeType.fixed,
+            unBoundedPush: 100,
             segment: 1,
+            safeZone: 1,
             thumbRadius: 30,
             railWidth: 5,
             ranges: [
@@ -141,6 +142,7 @@ class _VerticalScreenState extends State<VerticalScreen>
               RangeInfo(end: 150, color: Colors.purple),
             ],
             min: 1,
+            safeZone: 1,
             onChanged: (List<Range> value) {
               // print(value);
               setState(() {
